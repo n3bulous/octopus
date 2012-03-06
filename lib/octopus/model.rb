@@ -32,6 +32,7 @@ module Octopus::Model
     def hijack_initializer()
       attr_accessor :current_shard
       before_save :reload_connection
+      after_save :send_queries_to_master
 
       def set_current_shard
         if new_record? || self.class.connection_proxy.block
@@ -97,6 +98,11 @@ module Octopus::Model
     def reload_connection()
       return unless should_set_current_shard?
       self.class.connection_proxy.current_shard = self.current_shard
+    end
+
+    def send_queries_to_master
+      self.connection.set_write_occurred if self.class.connection_proxy.read_from_master_enabled?
+      true
     end
   end
 

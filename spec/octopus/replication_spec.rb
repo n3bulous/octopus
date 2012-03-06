@@ -92,3 +92,27 @@ describe "when the database is replicated and the entire application is replicat
   end
 end
 
+# These tests obviously depend on not actually having replication working.
+describe "when the database is fully replicated and read_from_master_after_write is true " do
+  before(:each) do
+    Octopus.stub!(:env).and_return("production_fully_replicated_with_read_from_master_after_write")
+    clean_connection_proxy()
+  end
+
+  it "reads from master after a write" do
+    using_environment :production_fully_replicated_with_read_from_master_after_write do
+      Cat.create!(:name => "Slave Cat")
+      Cat.find_by_name("Slave Cat").should_not be_nil
+    end
+  end
+
+  it "reads from slave after a connection is returned to the pool" do
+    using_environment :production_fully_replicated_with_read_from_master_after_write do
+      Cat.create!(:name => "Not on Slave Cat")
+      Cat.find_by_name("Not on Slave Cat").should_not be_nil
+      Cat.connection.reset_write_occurred
+      Cat.find_by_name("Not on Slave Cat").should be_nil
+    end
+  end
+end
+

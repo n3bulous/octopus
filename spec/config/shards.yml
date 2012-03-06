@@ -54,7 +54,7 @@ production_raise_error:
         database: octopus_shard4
         <<: *mysql
 
-production_replicated:
+production_replicated: &production_replicated
   replicated: true
   fully_replicated: false
 
@@ -72,8 +72,7 @@ production_replicated:
       database: octopus_shard5
       <<: *mysql
 
-
-production_fully_replicated:
+production_fully_replicated: &production_fully_replicated
   replicated: true
   shards:
     slave1:
@@ -88,6 +87,15 @@ production_fully_replicated:
     slave4:
       database: octopus_shard5
       <<: *mysql
+
+production_replicated_with_read_from_master_after_write:
+  read_from_master_after_write: true
+  <<: *production_replicated
+
+production_fully_replicated_with_read_from_master_after_write:
+  read_from_master_after_write: true
+  <<: *production_fully_replicated
+
 
 octopus_rails:
   replicated: true

@@ -8,12 +8,12 @@ The api is designed to be simple as possible. Octopus focuses on the end user, g
 Octopus supports:
 
 - Sharding (with multiple shards, and grouped shards).
-- Replication (Master/slave support, with multiple slaves).
+- Replication (Master/slave support, with multiple slaves, and reading from master after a write on the same connection).
 - Moving data between shards with migrations.
 - Tools to manage database configurations. (soon)
 
 ### Replication
-When using replication, all writes queries will be sent to master, and read queries to slaves. More info could be found at: <a href="http://wiki.github.com/tchandy/octopus/replication"> Wiki</a>
+When using replication, all writes queries will be sent to master, and read queries to slaves. More info could be found at: <a href="http://wiki.github.com/tchandy/octopus/replication"> Wiki</a>  You can elect to send read queries to master when a write occurs on the current connection.
 
 ### Sharding
  When using sharding, you need to specify which shard to send the query. Octopus supports selecting the shard inside a controller, or manually in each object. More could be found at <a href="http://wiki.github.com/tchandy/octopus/sharding"> Wiki</a>

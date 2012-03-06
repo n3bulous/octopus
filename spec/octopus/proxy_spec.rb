@@ -21,7 +21,11 @@ describe Octopus::Proxy do
       proxy.instance_variable_get(:@verify_connection).should be_false
     end
 
-    it "should work with thiking sphinx" do
+    it "does not read from master after write by default" do
+      proxy.instance_variable_get(:@read_from_master_after_write).should be_false
+    end
+
+    it "should work with thinking sphinx" do
       config = proxy.instance_variable_get(:@config)
       config[:adapter].should == "mysql"
       config[:password].should == ""
@@ -50,7 +54,7 @@ describe Octopus::Proxy do
       it 'should not fail with missing adapter second time round' do
         proxy.current_shard = :modify_config_read
         proxy.connection_pool.checkout
-        
+
         lambda { Octopus::Proxy.new(Octopus.config()) }.should_not raise_error("Please install the  adapter: `gem install activerecord--adapter` (cannot load such file -- active_record/connection_adapters/_adapter)")
       end
     end
@@ -111,6 +115,22 @@ describe Octopus::Proxy do
 
     it "should initialize the list of shards" do
       proxy.instance_variable_get(:@slaves_list).should == ["slave1", "slave2", "slave3", "slave4"]
+    end
+
+    describe "when you enable read_from_master_after_write" do
+      before(:each) do
+        set_octopus_env("production_replicated_with_read_from_master_after_write")
+      end
+
+      it "has read from master after write enabled" do
+        proxy.read_from_master_enabled?.should be_true
+      end
+
+      it "knows when a connection is in read from master mode" do
+        proxy.select_connection.set_write_occurred
+        proxy.read_from_master?.should be_true
+      end
+
     end
   end
 

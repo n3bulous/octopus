@@ -6,12 +6,12 @@ module Octopus
         super
       end
 
-      def update_attributes(attributes, options = {})
+      def update_attributes(*params)
         reload_connection()
         super
       end
 
-      def update_attributes!(attributes, options = {})
+      def update_attributes!(*params)
         reload_connection()
         super
       end

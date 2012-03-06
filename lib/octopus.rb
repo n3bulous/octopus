@@ -86,11 +86,14 @@ module Octopus
 end
 
 
+require 'octopus/connection_pool'
+require 'octopus/abstract_adapter'
 require "octopus/model"
 require "octopus/migration"
 require "octopus/association_collection"
 require "octopus/has_and_belongs_to_many_association"
 require "octopus/association"
+
 
 if Octopus.rails3?
   require "octopus/rails3/association"

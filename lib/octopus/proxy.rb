@@ -50,6 +50,9 @@ class Octopus::Proxy
 
   def initialize_replication(config)
     @replicated = true
+
+    @read_from_master_after_write = config["read_from_master_after_write"] ||= false
+
     if config.has_key?("fully_replicated")
       @fully_replicated = config["fully_replicated"]
     else
@@ -150,7 +153,7 @@ class Octopus::Proxy
   end
 
   def method_missing(method, *args, &block)
-    if should_clean_connection?(method)
+    if !@replicated && should_clean_connection?(method)
       conn = select_connection()
       self.last_current_shard = self.current_shard
       clean_proxy()
@@ -170,6 +173,14 @@ class Octopus::Proxy
     return @shards[current_shard]
   end
 
+  def read_from_master_enabled?
+    @read_from_master_after_write
+  end
+
+  def read_from_master?
+    read_from_master_enabled? && select_connection().write_occurred?
+  end
+
   protected
   def connection_pool_for(adapter, config)
     ActiveRecord::ConnectionAdapters::ConnectionPool.new(ActiveRecord::Base::ConnectionSpecification.new(adapter.dup, config))
@@ -184,12 +195,13 @@ class Octopus::Proxy
     end
   end
 
+  # currently only called from method missing.  Place && !@replicated before block if needed elsewhere.
   def should_clean_connection?(method)
-    method.to_s =~ /insert|select|execute/ && !@replicated && !self.block
+    method.to_s =~ /insert|select|execute/ && !self.block
   end
 
   def should_send_queries_to_replicated_databases?(method)
-    @replicated && method.to_s =~ /select/ && !@block
+    !read_from_master? && @replicated && !@block && method.to_s =~ /select/
   end
 
   def send_queries_to_selected_slave(method, *args, &block)
