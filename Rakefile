@@ -1,24 +1,10 @@
 require 'bundler/gem_tasks'
 require 'rspec/core/rake_task'
-require 'metric_fu'
 require 'appraisal'
 
 task :default => :spec
 
-MetricFu::Configuration.run do |config|
-  config.metrics = [:churn,:flay, :flog, :reek, :roodi, :saikuro]
-  config.graphs  = [:flog, :flay, :reek, :roodi]
-  config.flay    = { :dirs_to_flay => ['spec', 'lib']  }
-  config.flog    = { :dirs_to_flog => ['spec', 'lib']  }
-  config.reek    = { :dirs_to_reek => ['spec', 'lib']  }
-  config.roodi   = { :dirs_to_roodi => ['spec', 'lib'] }
-  config.churn   = { :start_date => "1 year ago", :minimum_churn_count => 10 }
-end
-
 RSpec::Core::RakeTask.new(:spec) do |spec|
-end
-
-RSpec::Core::RakeTask.new(:rcov) do |spec|
 end
 
 namespace :db do
@@ -26,32 +12,37 @@ namespace :db do
   task :build_databases do
     mysql_user = ENV['MYSQL_USER'] || "root"
     postgres_user = ENV['POSTGRES_USER'] || "postgres"
-    (1..5).each do |idx|
-      %x( echo "create DATABASE octopus_shard#{idx} DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_unicode_ci " | mysql --user=#{mysql_user})
-    end
 
-    %x( createdb -E UTF8 -U #{postgres_user} octopus_shard1 )
+    sql = (1..5).map do |i|
+      "CREATE DATABASE octopus_shard_#{i} DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_unicode_ci;"
+    end.join
+
+    %x( echo "#{sql}" | mysql -u #{mysql_user} )
+
+    # Postgres
+    %x( createdb -E UTF8 -U #{postgres_user} octopus_shard_1 )
   end
 
   desc 'Drop the tests databases'
   task :drop_databases do
     mysql_user = ENV['MYSQL_USER'] || "root"
     postgres_user = ENV['POSTGRES_USER'] || "postgres"
-    (1..5).each do |idx|
-      %x( mysqladmin --user=#{mysql_user} -f drop octopus_shard#{idx} )
-    end
 
-    %x( dropdb -U #{postgres_user} octopus_shard1 )
+    sql = (1..5).map { |i| "DROP DATABASE IF EXISTS octopus_shard_#{i};" }.join
+
+    %x( echo "#{sql}" | mysql -u "#{mysql_user}" )
+
+    %x( dropdb -U #{postgres_user} octopus_shard_1 )
     %x( rm -f /tmp/database.sqlite3 )
   end
 
   desc 'Create tables on tests databases'
   task :create_tables do
-    Dir.chdir(File.expand_path(File.dirname(__FILE__) + "/spec"))
-    require 'active_support/core_ext/class/inheritable_attributes'
-    require 'active_record'
-    require "support/database_connection"
+    Dir.chdir(File.expand_path("../spec", __FILE__))
+
     require "octopus"
+    require "support/database_connection"
+
     [:master, :brazil, :canada, :russia, :alone_shard, :postgresql_shard, :sqlite_shard].each do |shard_symbol|
       # Rails 3.1 needs to do some introspection around the base class, which requires
       # the model be a descendent of ActiveRecord::Base.

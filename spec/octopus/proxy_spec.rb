@@ -1,7 +1,7 @@
-require File.expand_path(File.dirname(__FILE__) + '/../spec_helper')
+require "spec_helper"
 
 describe Octopus::Proxy do
-  let(:proxy) { Octopus::Proxy.new(Octopus.config()) }
+  let(:proxy) { Octopus::Proxy.new }
 
   describe "creating a new instance" do
     it "should initialize all shards and groups" do
@@ -28,8 +28,7 @@ describe Octopus::Proxy do
     it "should work with thinking sphinx" do
       config = proxy.instance_variable_get(:@config)
       config[:adapter].should == "mysql"
-      config[:password].should == ""
-      config[:database].should == "octopus_shard1"
+      config[:database].should == "octopus_shard_1"
       config[:username].should == "root"
     end
 
