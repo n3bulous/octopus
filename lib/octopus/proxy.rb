@@ -2,9 +2,9 @@ require "set"
 
 class Octopus::Proxy
   attr_accessor :current_model, :current_shard, :current_group, :block,
-      :using_enabled, :last_current_shard, :config
+      :last_current_shard, :config
 
-  def initialize(config)
+  def initialize(config = Octopus.config)
     initialize_shards(config)
     initialize_replication(config) if !config.nil? && config["replicated"]
   end
@@ -127,7 +127,6 @@ class Octopus::Proxy
   end
 
   def clean_proxy()
-    @using_enabled = nil
     @current_shard = :master
     @current_group = nil
     @block = false
@@ -140,7 +139,7 @@ class Octopus::Proxy
   end
 
   def transaction(options = {}, &block)
-    if @replicated && (current_model.read_inheritable_attribute(:replicated) || @fully_replicated)
+    if @replicated && (current_model.replicated || @fully_replicated)
       self.run_queries_on_shard(:master) do
         select_connection.transaction(options, &block)
       end
@@ -196,17 +195,15 @@ class Octopus::Proxy
     old_shard = self.current_shard
 
     begin
-      if current_model.read_inheritable_attribute(:replicated) || @fully_replicated
+      if current_model.replicated || @fully_replicated
         self.current_shard = @slaves_list[@slave_index = (@slave_index + 1) % @slaves_list.length]
       else
         self.current_shard = :master
       end
 
-      sql = select_connection().send(method, *args, &block)
-      return sql
+      select_connection.send(method, *args, &block)
     ensure
       self.current_shard = old_shard
-      @using_enabled = nil
     end
   end
 end

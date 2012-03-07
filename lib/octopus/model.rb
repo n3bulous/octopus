@@ -9,7 +9,8 @@ module Octopus::Model
   module SharedMethods
     def clean_table_name
       return unless self.connection_proxy.should_clean_table_name?
-      if self != ActiveRecord::Base && self.respond_to?(:reset_table_name) && !self.read_inheritable_attribute(:set_table_name)
+
+      if self != ActiveRecord::Base && self.respond_to?(:reset_table_name) && !self.custom_octopus_table_name
         self.reset_table_name()
       end
 
@@ -20,13 +21,12 @@ module Octopus::Model
     end
 
     def using(shard)
-      return self if defined?(::Rails) && !Octopus.environments.include?(Rails.env.to_s)
-
-      clean_table_name()
-
-      self.connection_proxy.using_enabled = true
-
-      return Octopus::ScopeProxy.new(shard, self)
+      if Octopus.enabled?
+        clean_table_name
+        Octopus::ScopeProxy.new(shard, self)
+      else
+        self
+      end
     end
 
     def hijack_initializer()
@@ -52,23 +52,28 @@ module Octopus::Model
 
     def hijack_connection()
       def self.should_use_normal_connection?
-        (defined?(Rails) && Octopus.config() && !Octopus.environments.include?(Rails.env.to_s)) || self.read_inheritable_attribute(:establish_connection)
+        !Octopus.enabled? || self.custom_octopus_connection?
       end
 
       def self.connection_proxy
-        Thread.current[:connection_proxy] ||= Octopus::Proxy.new(Octopus.config())
+        Thread.current[:connection_proxy] ||= Octopus::Proxy.new
       end
 
-      def self.connection_with_octopus()
-        return connection_without_octopus() if should_use_normal_connection?
-
-        self.connection_proxy().current_model = self
-        self.connection_proxy()
+      def self.connection_with_octopus
+        if should_use_normal_connection?
+          connection_without_octopus
+        else
+          self.connection_proxy.current_model = self
+          self.connection_proxy
+        end
       end
 
-      def self.connection_pool_with_octopus()
-        return connection_pool_without_octopus if self.should_use_normal_connection?
-        self.connection_proxy.connection_pool
+      def self.connection_pool_with_octopus
+        if should_use_normal_connection?
+          connection_pool_without_octopus
+        else
+          connection_proxy.connection_pool
+        end
       end
 
       class << self
@@ -103,22 +108,29 @@ module Octopus::Model
   module ClassMethods
     include SharedMethods
 
-    def replicated_model()
-      write_inheritable_attribute(:replicated, true)
+    def self.extended(base)
+      base.class_attribute(:replicated)
+      base.class_attribute(:sharded)
+      base.class_attribute(:custom_octopus_connection)
+      base.class_attribute(:custom_octopus_table_name)
     end
 
-    def sharded_model()
-      write_inheritable_attribute(:sharded, true)
+    def replicated_model
+      self.replicated = true
+    end
+
+    def sharded_model
+      self.sharded = true
     end
 
     def octopus_establish_connection(spec = nil)
-      write_inheritable_attribute(:establish_connection, true)
+      self.custom_octopus_connection = true
       establish_connection(spec)
     end
 
-    def octopus_set_table_name(value = nil, &block)
-      write_inheritable_attribute(:set_table_name, true)
-      set_table_name(value, &block)
+    def octopus_set_table_name(value = nil)
+      self.custom_octopus_table_name = true
+      self.table_name = value
     end
   end
 end
